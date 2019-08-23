@@ -1,0 +1,92 @@
+---
+- hosts: rails
+  remote_user: root
+  become: yes
+  tasks:
+    - name: Update all packages to the latest version
+      apt:
+        upgrade: dist
+    - name: Add deploy user
+      user:
+        name: deploy
+        shell: /bin/bash
+    - name: Add SSH key to server for deploy user
+      authorized_key:
+        user: deploy
+        key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC48p9YMO5xBUqonZS0axWhAes6i6q8zQl3byOp11NnA/1t25X3oRNo9WM9lH4YvAPxbux4e82ov2XWLZ53VWGSXxmPzWSBpQjQEpoJi+WmPdS0HIoUkmvmx3jWL1857o86tYvNhONJtXYw6ZpGUTntZ9XOV0z9cohB1VTBidDS8dbp2zz+woZ502899YEaaMPbugD8rKezqxNQ+bXtfABGniF0shQCayU4S3KhNQ/1eLtm+uRTwwL2rNOtGE2YkphFyROxrtSVk5ZVe6PNL645o9zBL//JYkUG+3Cj7t3wnrCE5DMQqH/bXTYJ8fRjMCHImtiZc92oKWYTGxD4s0vxYAIfjkna7dGiGUGp8Nanr45wQ7qCrXHzNUSFVIo3h6GpCDW/EUv8y+1ucbEyLw76zT67WUp3O/jb0mz1IhW0bTNydh4QniS3hwEDy71qYAOSweAMenc2f9+p3zxEEEeTuErnnvv4KSeAlRSsy8H204PS7qy0IK6D3+ES+jUXSab/ot4Umg/W4Z9QJHUE7AI8+DXG8Sl8/jJFPlIpleJmjcZs1hTmxcwS9PY5/JwCx+mpdVzJvl+YYo7ex2fIk/CuiDBhosahj6ehKrTVAjBxbFrjB6k3ykpUTnhXjqVy89/I75PO0h5Kcq72T+w0ja0Eim+yOon75K88gsKAWR8egQ== deploy@campandbelly.com"
+    - name: Install Ruby dependencies
+      apt:
+        name:
+          - gcc
+          - autoconf
+          - bison
+          - build-essential
+          - libssl-dev
+          - libyaml-dev
+          - libreadline6-dev
+          - zlib1g-dev
+          - libncurses5-dev
+          - libffi-dev
+          - libgdbm5
+          - libgdbm-dev
+          - sqlite3
+          - libsqlite3-dev
+          - nodejs
+          - postgresql
+    - name: Download ruby-install
+      become: no
+      get_url:
+        url: https://github.com/postmodern/ruby-install/archive/v0.6.1.tar.gz
+        dest: /home/ubuntu/ruby-install-0.6.1.tar.gz
+    - name: Extract ruby-install tarball
+      become: no
+      unarchive:
+        src: /home/ubuntu/ruby-install-0.6.1.tar.gz
+        dest: /home/ubuntu
+        creates: /home/ubuntu/ruby-install-0.6.1
+        remote_src: yes
+    - name: Install ruby-install
+      make:
+        chdir: /home/ubuntu/ruby-install-0.6.1
+        target: install
+    - name: Install Ruby
+      become_user: deploy
+      command: /usr/local/bin/ruby-install --no-install-deps ruby 2.5.0
+      args:
+        creates: /home/deploy/.rubies/ruby-2.5.0
+    - name: Download chruby
+      become: no
+      get_url:
+        url: https://github.com/postmodern/chruby/archive/v0.3.9.tar.gz
+        dest: /home/ubuntu/chruby-0.3.9.tar.gz
+    - name: Extract chruby tarball
+      become: no
+      unarchive:
+        src: /home/ubuntu/chruby-0.3.9.tar.gz
+        dest: /home/ubuntu
+        creates: /home/ubuntu/chruby-0.3.9
+        remote_src: yes
+    - name: Install chruby
+      make:
+        chdir: /home/ubuntu/chruby-0.3.9
+        target: install
+    - name: Load chruby for deploy user
+      lineinfile:
+        path: /home/deploy/.bashrc
+        regexp: 'chruby.sh$'
+        line: 'source /usr/local/share/chruby/chruby.sh'
+        insertbefore: BOF
+    - name: Set ruby version for deploy user
+      lineinfile:
+        path: /home/deploy/.profile
+        regexp: '^chruby'
+        line: 'chruby ruby-2.5.0'
+    - name: Install bundler
+      become_user: deploy
+      command: 'chruby-exec ruby-2.5.0 -- gem install bundler'
+      args:
+        creates: /home/deploy/.gem/ruby/2.5.0/bin/bundle
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: latest
