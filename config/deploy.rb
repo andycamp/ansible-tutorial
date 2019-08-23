@@ -2,9 +2,11 @@
 lock "~> 3.11.0"
 
 set :application, "ansible_tutorial"
-set :repo_url, "git@github.com:andycamp/ansible_tutorial.git"
+set :repo_url, "git@github.com:andycamp/ansible-tutorial.git"
 set :deploy_to, "/home/deploy/apps"
 append :linked_dirs, "log", "tmp/pids", "tmp/cache", "tmp/sockets"
+
+set :chruby_ruby, 'ruby-2.4.6'
 
 # Default branch is :master
 # ask :branch, `git rev-parse --abbrev-ref HEAD`.chomp
